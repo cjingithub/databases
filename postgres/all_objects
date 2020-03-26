@@ -1,0 +1,24 @@
+select 	-- nsp.nspname as object_schema,
+       	-- cls.relname as object_name, 
+	nsp.nspname || '.' || cls.relname as full_name, 
+	cls.oid,	
+       rol.rolname as owner, 
+       case cls.relkind
+	when 'r' then 'TABLE'
+       	when 'i' then 'INDEX'
+        when 'S' then 'SEQUENCE'
+	when 't' then 'TOAST'
+        when 'v' then 'VIEW'
+        when 'm' then 'MATERIALIZED_VIEW'
+        when 'c' then 'Composite TYPE'
+	when 'f' then 'Foreign table'
+	when 'p' then 'Partitioned table'
+	when 'I' then 'partitioned Index'
+         else cls.relkind::text
+       	end as type,
+	dense_rank() over (order by cls.relkind) as rank
+from pg_class cls join pg_roles rol on rol.oid = cls.relowner
+join pg_namespace nsp on nsp.oid = cls.relnamespace
+where nsp.nspname not in ( 'information_schema', 'pg_catalog' )
+	and nsp.nspname not like 'pg_toast%'
+order by rank, full_name ;
