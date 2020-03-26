@@ -1,0 +1,73 @@
+-- активность
+select clock_timestamp()::timestamp(0) as run_date,
+ (clock_timestamp() - query_start)::interval(0) as elapsed_time,
+ pid,
+ datname,
+ query,
+ state,
+ wait_event_type,
+ wait_event,
+ pg_blocking_pids(pid) as blocked_by,
+ client_hostname as host,
+ client_addr as ip,
+ usename as user,
+ application_name as app_name
+from pg_stat_activity
+where 1=1
+ and state = 'active'
+ and backend_type = 'client backend'
+ and pid <> pg_backend_pid()
+order by elapsed_time desc ;
+
+-- idle in tx
+select * from pg_stat_activity
+where state = 'idle in transaction' ;
+-- and current_timestamp - query_start > '10 min';
+
+-- prepared in-dout tx
+select t.schemaname || '.' || t.relname as tablename, l.pid, l.granted
+from pg_locks l
+join pg_stat_user_tables t on l.relation = t.relid ;
+
+-- статистика по бд
+select datname,
+	count(*) as open,
+	count(*) filter (where state = 'active') as active,
+	count(*) filter (where state = 'idle') as idle,
+	count(*) filter (where state = 'idle in transaction') as idle_in_tx
+from pg_stat_activity
+where backend_type = 'client backend'
+group by rollup(1);
+
+-- как давно открыты транзакции
+select pid, xact_start, now() - xact_start as duraction
+from pg_stat_activity
+where state like '%transaction%'
+order by 3 desc;
+
+-- long_tx_monitor
+do $$
+declare
+	r record;
+begin
+	for r in
+	select row_number() over(),
+		round(extract(epoch from clock_timestamp() - xact_start)::numeric, 2) as xact_age_sec,
+		round(extract(epoch from clock_timestamp() - state_change)::numeric, 2) as state_age_sec,
+		clock_timestamp() - xact_start as xact_age,
+		clock_timestamp() - state_change as state_age,
+		*
+	from pg_stat_activity
+	where query not like 'autovacuum:%'
+	and clock_timestamp() - xact_start > interval '1 minute'
+	order by 1 desc
+	loop 
+	if r.xact_age_sec > 600 then
+	raise warning '[long_tx_monitor] %', row_to_json(r);
+	else
+	raise log '[long_tx_monitor] %', row_to_json(r);
+	end if;
+	end loop;
+end;
+$$;
+
