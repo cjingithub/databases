@@ -1,0 +1,29 @@
+select 	t.schemaname,
+	t.relname,
+	c.reltuples::bigint as cnt,
+	pg_total_relation_size(stat.relid) / 1024 / 1024::int as t_mb,
+	pg_relation_size(stat.relid) / 1024 / 1024::int as tup_mb,
+ 	pg_total_relation_size(stat.relid)/  1024 / 1024 - pg_relation_size(stat.relid) / 1024 / 1024::int as idx_mb,
+	t.seq_scan as seq,
+	t.seq_tup_read as s_r, 
+	t.idx_scan as idx,    
+	t.idx_tup_fetch as idx_r,
+	t.n_tup_ins as i,
+	t.n_tup_upd as u,
+	t.n_tup_del as d,
+	t.n_tup_hot_upd as hot,      
+	t.n_live_tup as live,         
+	t.n_dead_tup as dead,          
+	t.n_mod_since_analyze as n_mode,  
+	t.last_vacuum::timestamp(0) as vac,         
+	t.last_autovacuum::timestamp(0) as au_v,      
+	t.last_analyze::timestamp(0) as anal,         
+	t.last_autoanalyze::timestamp(0) as au_a,   
+	t.vacuum_count as v_c,        
+	t.autovacuum_count as au_v_c,    
+	t.analyze_count as a_c,       
+	t.autoanalyze_count as au_a_c 
+from pg_stat_user_tables t 
+join pg_class c on t.relid = c.oid
+join pg_statio_user_tables stat on stat.relid = t.relid
+order by t_mb desc;
