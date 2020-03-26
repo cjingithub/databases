@@ -1,9 +1,7 @@
-select 	-- nsp.nspname as object_schema,
-       	-- cls.relname as object_name, 
-	nsp.nspname || '.' || cls.relname as full_name, 
+select 	nsp.nspname || '.' || cls.relname as full_name, 
 	cls.oid,	
-       rol.rolname as owner, 
-       case cls.relkind
+       	rol.rolname as owner, 
+       	case cls.relkind
 	when 'r' then 'TABLE'
        	when 'i' then 'INDEX'
         when 'S' then 'SEQUENCE'
