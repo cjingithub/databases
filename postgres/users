@@ -1,0 +1,17 @@
+-- users and roles
+select rolname as user,
+	case when rolcanlogin then 'user'
+	else 'group'
+	end,
+	case when rolsuper then 'superuser'
+	else 'normal'
+	end as super
+from pg_authid
+order by rolcanlogin, rolname;
+
+-- users and search_path
+select r.rolname, d.datname, rs.setconfig
+from pg_db_role_setting rs
+left join pg_roles r on r.oid = rs.setrole
+left join pg_database d on d.oid = rs.setdatabase
+order by r.rolname, d.datname;
