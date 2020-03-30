@@ -1,0 +1,17 @@
+########################################################
+# custom format 
+########################################################
+-- create dump
+pg_dump -F c -d db_name -f /backup/db_name.dump
+
+-- restore
+pg_restore -d newdb /backup/db_name.dump
+
+########################################################
+# directory format 
+########################################################
+-- create dump
+pg_dump -F d -j 4 -d demo -f /backup/dump/demo.dir
+
+-- restore
+pg_restore -d demo2 -j 4 /backup/dump/demo.dir
