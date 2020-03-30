@@ -1,0 +1,94 @@
+use [master];
+go
+set nocount on
+
+declare	  @servername sysname			= cast ( serverproperty('machinename') as varchar(50) )
+		    , @dbname sysname				  = 'db_name'
+		    , @backupType char(1)			= 'f'									-- f - full; d - dif; l - log
+		    , @path	nvarchar(1000)		= N'\\backupvirt\sqlbackup\SQLBackups\' 
+		    , @isCopyOnly bit				= 0										-- 1 - WITH COPY_ONLY 
+		    , @backupname nvarchar(1000)
+		    , @sql nvarchar(max)
+		    , @folderExists int
+
+declare @fileResults table ( file_exists int, file_is_a_directory int, parent_directory_exists int )
+
+set @sql = LEFT( @dbname, 1 )
+
+if @sql = '['
+	set @dbname = SUBSTRING( @dbname, 2, LEN(@dbname) - 2 )
+
+set @path = @path + @servername + '\' + @dbname + '\'
+
+insert into @fileResults ( file_exists, file_is_a_directory, parent_directory_exists )
+	exec [master].[dbo].[xp_fileexist] @path
+
+select @folderExists = file_is_a_directory
+from @fileResults
+
+-- если папки нет, создаем
+if @folderExists = 0
+	exec [master].[dbo].[xp_create_subdir] @path
+
+if @backupType = 'f'
+begin
+       
+	if @isCopyOnly = 1
+	begin 
+		set @backupname = @dbname + N'_backup_copyonly_' + FORMAT(GETDATE(), 'yyyy_MM_dd_Hmmss') + N'.bak'
+	--	set @backupname = @dbname + N'_backup_copyonly_' + CONVERT(VARCHAR(20),GETDATE(),112) + N'_' + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','') + N'.bak'
+
+		set @sql = N'BACKUP DATABASE ' + '[' + @dbname + ']' + N' TO  DISK = ' + N'''' + @path + @backupname + N'''' + N' WITH COMPRESSION, COPY_ONLY, STATS = 5'
+		exec(@sql)
+	end
+
+	if @isCopyOnly = 0
+	begin
+		set @backupname = @dbname + N'_backup_' + FORMAT(GETDATE(), 'yyyy_MM_dd_Hmmss') + N'.bak'
+	--	set @backupname = @dbname + N'_backup_' + CONVERT(VARCHAR(20),GETDATE(),112) + N'_' + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','') + N'.bak'
+
+		set @sql = N'BACKUP DATABASE ' + '[' + @dbname + ']' + N' TO  DISK = ' + N'''' + @path + @backupname + N'''' + N' WITH COMPRESSION, CHECKSUM, STATS = 5'
+		exec(@sql)
+
+		set @sql = N'RESTORE VERIFYONLY FROM  DISK = ' + N'''' + @path + @backupname + ''''
+		exec(@sql)
+	end
+
+end -- if @backupType = 'f'
+
+if @backupType = 'd'
+begin
+
+	set @backupname = @dbname + N'_backup_' + FORMAT(GETDATE(), 'yyyy_MM_dd_Hmmss') + N'.dif'
+--	set @backupname = @dbname + N'_backup_' + CONVERT(VARCHAR(20),GETDATE(),112) + N'_' + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','') + N'.dif'
+
+	set @sql = N'BACKUP DATABASE ' + '[' + @dbname + ']' + N' TO  DISK = ' + N'''' + @path + @backupname + N'''' + N' WITH DIFFERENTIAL, CHECKSUM, STATS = 5'
+	exec(@sql)
+
+end -- if @backupType = 'd'
+
+if @backupType = 'l'
+begin
+	
+	if @isCopyOnly = 1 
+	begin
+		set @backupname = @dbname + '_backup_copyonly_' + FORMAT(GETDATE(), 'yyyy_MM_dd_Hmmss') + '.trn'
+	--	set @backupname = @dbname + N'_backup_' + CONVERT(VARCHAR(20),GETDATE(),112) + N'_' + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','') + N'.bak'
+
+		set @sql = 'BACKUP LOG ' + '[' + @dbname + ']' +  ' TO  DISK = N' + '''' + @path + @backupname + '''' + ' WITH COPY_ONLY, COMPRESSION, STATS = 5'
+		exec(@sql)
+	end
+
+	if @isCopyOnly = 0
+	begin
+		set @backupname = @dbname + N'_backup_' + FORMAT(GETDATE(), 'yyyy_MM_dd_Hmmss') + N'.trn'
+		--	set @backupname = @dbname + N'_backup_' + CONVERT(VARCHAR(20),GETDATE(),112) + N'_' + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','') + N'.bak'
+
+		set @sql = N'BACKUP LOG ' + '[' + @dbname + ']' +  N' TO  DISK = ' + N'''' + @path + @backupname + N'''' + N' WITH COMPRESSION, CHECKSUM, STATS = 5'
+		exec(@sql)
+
+		set @sql = N'RESTORE VERIFYONLY FROM  DISK = ' + N'''' + @path + @backupname + ''''
+		exec(@sql)
+	end -- if @isCopyOnly = 0
+
+end
