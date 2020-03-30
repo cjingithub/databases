@@ -1,0 +1,45 @@
+# random value
+CREATE FUNCTION rnd_integer(min_value integer, max_value integer) RETURNS integer
+AS $$
+DECLARE
+    retval integer;
+BEGIN
+    IF max_value <= min_value THEN 
+       RETURN NULL; 
+    END IF;
+
+    retval := floor((max_value+1 - min_value)*random())::integer + min_value;
+    RETURN retval;
+END;
+$$ STRICT LANGUAGE plpgsql;
+
+select * from rnd_integer(1,10);
+
+SELECT rnd_integer(0,1) as "0 - 1",
+          rnd_integer(1,365) as "1 - 365",
+          rnd_integer(-30,30) as "-30 - +30"
+FROM generate_series(1,10);
+
+
+# random text
+CREATE FUNCTION rnd_text(
+   len int,
+   list_of_chars text DEFAULT 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789'
+) RETURNS text
+AS $$
+DECLARE
+    len_of_list CONSTANT integer = length(list_of_chars);
+    i integer;
+    retval text = '';
+BEGIN
+    FOR i IN 1 .. len LOOP
+        -- добавляем к строке случайный символ
+        retval := retval || substr(list_of_chars, rnd_integer(1,len_of_list),1);
+    END LOOP;
+    RETURN retval;
+END;
+$$ STRICT LANGUAGE plpgsql;
+
+SELECT rnd_text(rnd_integer(1,30)) ;
+
+SELECT rnd_text(rnd_integer(1,30)) FROM generate_series(1,10);
