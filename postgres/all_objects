@@ -1,7 +1,9 @@
-select 	nsp.nspname || '.' || cls.relname as full_name, 
+select 	nsp.nspname as schema,
+       	cls.relname as name, 
+	-- nsp.nspname || '.' || cls.relname as full_name, 
 	cls.oid,	
-       	rol.rolname as owner, 
-       	case cls.relkind
+       rol.rolname as owner, 
+       case cls.relkind
 	when 'r' then 'TABLE'
        	when 'i' then 'INDEX'
         when 'S' then 'SEQUENCE'
@@ -19,4 +21,4 @@ from pg_class cls join pg_roles rol on rol.oid = cls.relowner
 join pg_namespace nsp on nsp.oid = cls.relnamespace
 where nsp.nspname not in ( 'information_schema', 'pg_catalog' )
 	and nsp.nspname not like 'pg_toast%'
-order by rank, full_name ;
+order by rank, schema, name ;
