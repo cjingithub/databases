@@ -1,0 +1,146 @@
+use [master];
+go
+set nocount on
+
+declare   @dbname sysname				        = 'db_name'																						
+		    , @BKFolder varchar(255)		    = 'D:\Microsoft SQL Server\MSSQL10.MSSQLSERVER\MSSQL\Backup\'			
+	    	, @BKName varchar(255)			    = 'local_tools_FULL_2019_04_18_135948.bak'											
+		    , @RestoreToDir varchar(255)	  = 'D:\Microsoft SQL Server\MSSQL10.MSSQLSERVER\MSSQL\DATA'		
+		    , @RestoreToDirLog varchar(255)	= '0'							-- '0' - same folder as db files
+		    , @taskNumber varchar(255)		  = '-'									-- '0' - dbname_yyyy_mm_dd_time; '-' - simple @dbname 										
+		    , @isRecovery bit				        = 1
+		    , @isGoodFileNames bit			    = 0
+		    , @isPrintResult bit			      = 0
+		    , @str varchar(max)		
+
+declare @logicalNames table ( 
+							  LogicalName nvarchar(128)
+							, PhysicalName nvarchar(260)
+							, [type] char(1)
+							, FileGroupName nvarchar(128)
+							, Size numeric(20,0)
+							, MaxSize numeric(20,0)
+							, FileID bigint
+							, CreateLSN numeric(25,0)
+							, DropLSN numeric(25,0) 
+							, UniqueID uniqueidentifier
+							, ReadOnlyLSN numeric(25,0)
+							, ReadWriteLSN numeric(25,0)
+							, BackupSizeInBytes bigint
+							, SourceBlockSize int
+							, FileGroupID int
+							, LogGroupGUID uniqueidentifier 
+							, DifferentialBaseLSN numeric(25,0)
+							, DifferentialBaseGUID uniqueidentifier
+							, IsReadOnly bit
+							, IsPresent bit
+							, TDEThumbprint varbinary(32) 
+							, SnapshotURL nvarchar(360)		-- для SQL Server 2016
+							)
+if @taskNumber = '0'
+	set @dbname = @dbname + '_' + LEFT(SUBSTRING(@BKName, PATINDEX('%201%', @BKName), len(@BKName)), len(SUBSTRING(@BKName, PATINDEX('%201%', @BKName), len(@BKName))) - len('.bak'))
+
+else if @taskNumber = '-'
+	set @dbname = @dbname
+
+else
+	set @dbname = @dbname + '_' + @taskNumber + '_' + LEFT(SUBSTRING(@BKName, PATINDEX('%201%', @BKName), len(@BKName)), len(SUBSTRING(@BKName, PATINDEX('%201%', @BKName), len(@BKName))) - len('.bak'))
+ 
+set @str = 'RESTORE FILELISTONLY FROM DISK = N''' + @BKFolder + '\' + @BKName + ''''
+
+insert into @logicalNames
+	exec (@str)
+-- select * from @logicalNames
+
+select @str = 'RESTORE DATABASE ' + '[' + @dbname + ']' + char(13) + ' FROM  DISK = ' + '''' + @BKFolder + @BKName + '''' + char(13)
+
+if @RestoreToDirLog = '0'
+	set @RestoreToDirLog = @RestoreToDir
+
+if @RestoreToDir = '0' and @RestoreToDirLog = '0'
+begin
+	if cast ( serverproperty('machinename') as varchar(50) ) = 'ADFRONTSQL1'
+	select	@RestoreToDir = 'D:\MSSQL\DATA\',
+			@RestoreToDirLog = 'D:\MSSQL\DATA\'
+
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'BACKUPSRV02'
+	select	@RestoreToDir = 'D:\Data\',
+			@RestoreToDirLog = 'D:\Data\'
+
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'BACKUPSRV03'
+	select	@RestoreToDir = 'E:\MSSQL_BackupsrvNew03\Data\',
+			@RestoreToDirLog = 'E:\MSSQL_BackupsrvNew03\Data\'
+
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'DATAFEEDWORK'
+	select	@RestoreToDir = 'D:\Data\',
+			@RestoreToDirLog = 'D:\Data\'
+
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'ESUSDB'
+	select	@RestoreToDir = 'D:\Data\',
+			@RestoreToDirLog = 'D:\Data\'
+
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'POSTTRADE'
+	select	@RestoreToDir = 'E:\Data\',
+			@RestoreToDirLog = 'E:\Data\'
+
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'HYPERNEW1'
+	select	@RestoreToDir = 'E:\DB\',
+			@RestoreToDirLog = 'E:\DB\'
+			
+	else if cast ( serverproperty('machinename') as varchar(50) ) = 'HYPERNEW2'
+	select	@RestoreToDir = 'F:\MSSQL\Data\',
+			@RestoreToDirLog = 'F:\MSSQL\Data\'
+
+	else 
+	select	@RestoreToDir = 'D:\Data\',
+			@RestoreToDirLog = 'D:\Data\'
+
+end
+
+if @isGoodFileNames = 0
+begin
+	select @str = @str  + case 
+							when FileID = 1 then ' WITH MOVE '
+							else ',' + char(13) + 'MOVE ' 
+							end  + 
+
+						'''' + LogicalName + '''' + ' TO ' + '''' + case when [Type] = 'D' then @RestoreToDir
+																		 when [Type] = 'L' then @RestoreToDirLog
+																	end + 
+
+							substring (reverse(substring(reverse(rtrim(PhysicalName)),1,patindex('%\%',reverse(rtrim(PhysicalName)))-1 )), 0, charindex('.', reverse(substring(reverse(rtrim(PhysicalName)),1,patindex('%\%',reverse(rtrim(PhysicalName)))-1 )))) + '_' +
+					
+								CONVERT(VARCHAR(20),GETDATE(),112) + N'_' + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','') + '.' + reverse(substring(reverse(rtrim(PhysicalName)),1,patindex('%.%',reverse(rtrim(PhysicalName)))-1 )) + ''''
+	from @logicalNames
+	order by FileID asc 
+end
+
+if @isGoodFileNames = 1
+begin
+	select @str = @str  + case 
+							when FileID = 1 then ' WITH MOVE '
+							else ',' + char(13) + 'MOVE ' 
+							end  + 
+
+						'''' + LogicalName + '''' + ' TO ' + '''' + case when [Type] = 'D' then @RestoreToDir
+																		 when [Type] = 'L' then @RestoreToDirLog
+																	end +  
+
+							+ substring (reverse(substring(reverse(rtrim(PhysicalName)),1,patindex('%\%',reverse(rtrim(PhysicalName)))-1 )), 0, charindex('.', reverse(substring(reverse(rtrim(PhysicalName)),1,patindex('%\%',reverse(rtrim(PhysicalName)))-1 )))) 
+					
+								+ '.' + reverse(substring(reverse(rtrim(PhysicalName)),1,patindex('%.%',reverse(rtrim(PhysicalName)))-1 )) + ''''
+	from @logicalNames
+	order by FileID asc 
+end
+
+if @isRecovery = 1
+	set @str =  @str + char(13) + ',' +  ' STATS = 5 ' + ', RECOVERY;'
+
+if @isRecovery = 0
+	set @str =  @str + char(13) + ',' +  ' STATS = 5 ' + ', NORECOVERY;'
+
+if @isPrintResult = 0
+	exec(@str)
+	
+if @isPrintResult = 1  
+	print(@str)
