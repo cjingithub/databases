@@ -2,10 +2,10 @@
 # custom format 
 ########################################################
 -- create dump
-pg_dump -F c -d db_name -f /backup/db_name.dump
+pg_dump -F c -d demo -f /backup/demo.dump
 
 -- restore
-pg_restore -d newdb /backup/db_name.dump
+pg_restore -d demo2 /backup/demo.dump
 
 ########################################################
 # directory format 
