@@ -1,0 +1,40 @@
+-- tables, views, seq 
+DO $$
+DECLARE 
+  schema text[] := '{bookings}';
+  new_owner name := 'u1';
+  sql text;
+BEGIN
+    FOR sql IN 
+    	SELECT format('ALTER TABLE %I.%I OWNER TO %I', n.nspname, c.relname, new_owner)
+    	FROM pg_class c
+    	JOIN pg_namespace n ON n.oid = c.relnamespace
+    	WHERE n.nspname = ANY (schema)
+    		AND c.relkind in ( 'r', 'v', 'S' )
+ 
+     LOOP
+        RAISE NOTICE 'applying: %', sql;
+	EXECUTE sql;
+    END LOOP;
+END
+$$ LANGUAGE plpgsql;
+
+-- functions 
+DO $$
+declare
+  schema text[] := '{bookings}';
+  new_owner name := 'postgres';
+  sql text;
+
+  funcnames CURSOR FOR
+    SELECT n.nspname as schema, p.proname as name, pg_catalog.pg_get_function_identity_arguments(p.oid) as params
+    FROM pg_proc p 
+    JOIN pg_namespace n ON n.oid = p.pronamespace 
+    WHERE n.nspname = ANY (schema);
+
+begin
+  FOR sql IN funcnames LOOP
+    EXECUTE 'alter function ' || sql.schema || '.' || sql.name || '(' ||  sql.params || ') owner to ' || new_owner || ';';
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
