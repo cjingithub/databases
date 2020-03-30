@@ -1,0 +1,18 @@
+DO $$
+DECLARE
+ old_schema name := 'bookings';
+ new_schema name := 'dbo';
+ sql text;
+BEGIN
+FOR sql IN
+    SELECT format('ALTER TABLE %I.%I SET SCHEMA %I', n.nspname, c.relname, new_schema)
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = old_schema 
+    AND c.relkind in ('r', 'v')
+  LOOP
+    RAISE NOTICE 'appliying %', sql;
+    EXECUTE sql;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
