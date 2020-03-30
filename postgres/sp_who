@@ -1,4 +1,4 @@
--- активность
+-- db activity
 select clock_timestamp()::timestamp(0) as run_date,
  (clock_timestamp() - query_start)::interval(0) as elapsed_time,
  pid,
@@ -29,7 +29,7 @@ select t.schemaname || '.' || t.relname as tablename, l.pid, l.granted
 from pg_locks l
 join pg_stat_user_tables t on l.relation = t.relid ;
 
--- статистика по бд
+-- client activity
 select datname,
 	count(*) as open,
 	count(*) filter (where state = 'active') as active,
@@ -39,7 +39,7 @@ from pg_stat_activity
 where backend_type = 'client backend'
 group by rollup(1);
 
--- как давно открыты транзакции
+-- tx age
 select pid, xact_start, now() - xact_start as duraction
 from pg_stat_activity
 where state like '%transaction%'
