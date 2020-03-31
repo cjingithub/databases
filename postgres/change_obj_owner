@@ -34,6 +34,7 @@ declare
 
 begin
   FOR sql IN funcnames LOOP
+    RAISE NOTICE 'applying: %', sql; 
     EXECUTE 'alter function ' || sql.schema || '.' || sql.name || '(' ||  sql.params || ') owner to ' || new_owner || ';';
   END LOOP;
 END;
