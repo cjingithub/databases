@@ -4,20 +4,21 @@ select 	nsp.nspname as schema,
 	cls.oid,	
        rol.rolname as owner, 
        case cls.relkind
-	when 'r' then 'TABLE'
-       	when 'i' then 'INDEX'
-        when 'S' then 'SEQUENCE'
-	when 't' then 'TOAST'
-        when 'v' then 'VIEW'
-        when 'm' then 'MATERIALIZED_VIEW'
-        when 'c' then 'Composite TYPE'
-	when 'f' then 'Foreign table'
-	when 'p' then 'Partitioned table'
+	when 'r' then 'table'
+       	when 'i' then 'index'
+        when 'S' then 'sequence'
+	when 't' then 'toast'
+        when 'v' then 'view'
+        when 'm' then 'materialized_view'
+        when 'c' then 'composite TYPE'
+	when 'f' then 'foreign table'
+	when 'p' then 'partitioned table'
 	when 'I' then 'partitioned Index'
          else cls.relkind::text
        	end as type,
 	dense_rank() over (order by cls.relkind) as rank
-from pg_class cls join pg_roles rol on rol.oid = cls.relowner
+from pg_class cls 
+join pg_roles rol on rol.oid = cls.relowner
 join pg_namespace nsp on nsp.oid = cls.relnamespace
 where nsp.nspname not in ( 'information_schema', 'pg_catalog' )
 	and nsp.nspname not like 'pg_toast%'
